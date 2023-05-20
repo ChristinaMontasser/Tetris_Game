@@ -122,7 +122,6 @@ class TetrisEnv:
         new_board = np.delete(board, slice(start_collapse, end_collapse), axis=0)  # now we need to add them
         new_board = np.insert(new_board, slice(0, end_collapse - start_collapse), 0, axis=0)
         score = self.__get_score(end_collapse - start_collapse)
-
         return score, new_board
 
     def __game_over(self, test_board):
@@ -144,7 +143,9 @@ class TetrisEnv:
             chosen_row = next_row
         self.board[chosen_row:chosen_row + p_dims[0], col:col + p_dims[1]] |= falling_piece
         collapse_score, new_board = self.__collapse_rows(self.board)
+        #print(collapse_score)
         collapse_score += np.sum(falling_piece) * TetrisEnv.SCORE_PIXEL
+        #print(collapse_score)
         if self.__game_over(new_board):
             return TetrisEnv.GAMEOVER_PENALTY
         self.board = new_board
@@ -178,7 +179,7 @@ class TetrisEnv:
 
     def __get_lose_msg(self):
         # if understood, send to owner
-        lose_msg = b'Hello'
+        lose_msg = b'You LOST'
         return lose_msg
 
     def run(self, scoring_function, genetic_params, num_of_iters, return_trace):
@@ -198,7 +199,10 @@ class TetrisEnv:
                 self.score += play_score
                 self.__gen_next_piece()
                 if play_score < 0:
-                    return self.score, self.board, self.__get_lose_msg()
+                    if(self.score<0):
+                        return self.score, board_states, ratings_n_rotations, pieces_got, self.__get_lose_msg()
+                    else: 
+                        return self.score, board_states, ratings_n_rotations, pieces_got, ""
             return self.score, self.board, ""
         else:  # we want to trace
             board_states = []
@@ -221,7 +225,11 @@ class TetrisEnv:
                 self.__gen_next_piece()
                 board_states.append(self.board.copy())
                 if play_score < 0:
-                    return self.score, board_states, ratings_n_rotations, pieces_got, self.__get_lose_msg()
+                    if(self.score<0):
+                        return self.score, board_states, ratings_n_rotations, pieces_got, self.__get_lose_msg()
+                    else: 
+                        return self.score, board_states, ratings_n_rotations, pieces_got, ""
+
             return self.score, board_states, ratings_n_rotations, pieces_got, ""
         # don't really feel like removing redundancy, cleaning code
 
@@ -231,7 +239,7 @@ def number_of_holes(board):
     gaps = 0
     for col in range(width-1):
         gap = False
-        for row in range(height-1, 0, -1):
+        for row in range(height-2, 0, -1):
             if not board[row][col]:
               if ((board[row+1][col] or gap) and (board[row][col-1] or col-1 == 0 or board[row-1][col-1]) and (board[row][col+1] or col == width-1 or board[row+1][col+1])):
                     gaps += 1
@@ -288,18 +296,20 @@ def random_scoring_function(tetris_env: TetrisEnv, gen_params, col):
         #Number of holes
     #     #Blockades
     board, piece, next_piece = tetris_env.get_status()  # add type hinting
+    
     rows_before=count_complete_rows(board)
     val1_scores = []
     val2_bumpiness = []
     val3_landing_height = []
     val4_clear_rows_after = []
+    val5_number_of_holes = []
     for i in range(4):
         score, tmp_board = tetris_env.test_play(board, piece, col, i)
         val4_clear_rows_after.append(count_complete_rows(tmp_board)-rows_before)
         val2_bumpiness.append(calculate_bumpiness(tmp_board))
         l_piece=tetris_env.Pieces[piece]
         val3_landing_height.append(calculate_landing_height(board, l_piece, col, i))
-
+        val5_number_of_holes.append(number_of_holes(board))
         if score < 0:
             val1_scores.append(score )
             continue
@@ -313,9 +323,8 @@ def random_scoring_function(tetris_env: TetrisEnv, gen_params, col):
             score += max_score2
         val1_scores.append(score)
 
-    fitness = [gen_params[0]*val1_scores[i] + gen_params[1]*val2_bumpiness[i] + gen_params[2]*val3_landing_height[i] + gen_params[3]*val4_clear_rows_after[i] for i in range(4)]
+    fitness = [gen_params[0]*val1_scores[i] + gen_params[1]*val2_bumpiness[i] + gen_params[2]*val3_landing_height[i] - val4_clear_rows_after[i] - val5_number_of_holes[i] for i in range(4)]
     index, rate = max(enumerate(fitness), key=lambda item: item[1])  # need to store it first or it iterates
-    # print(val)
     return  rate, index
 
 
@@ -345,7 +354,7 @@ class GA:
 
     def init_population(self):
         for i in range(self.init_pop_size):
-            chromosome = [random.uniform(1, 10), random.uniform(-6, -1), random.uniform(1, 5), random.uniform(1, 5)]
+            chromosome = [random.uniform(1, 10), random.uniform(-6, -1), random.uniform(1, 5), random.uniform(1, 5), random.uniform(0, 1)]
             self.population.append(chromosome)
         
     def __selection_operator(self, best_individual_indices: list,  number): # len(fitness_scores) = number of(choromsss)
@@ -419,7 +428,7 @@ if __name__ == "__main__":
     use_visuals_in_trace = False
     sleep_time = 0.8
     pop_size= 20
-    eposide = 10 
+    eposide = 1
     # just one chromosome in the population
     ga_algo=GA(pop_size)
     population = ga_algo.population
@@ -428,11 +437,13 @@ if __name__ == "__main__":
     #                [3, -4.915090563907668, 2, 5], [2.8673550667, -4.915090563907668, 4, 4.303487143315175],
     #                [4, -4.915090563907668, 1.7326229294816473, 4.303487143315175]]
     #one_chromo_competent = [-4, -1, 2,3]
+    #population  = [[4.555424009948208, -2.3777412669638744, 1.0187479578329186, 2.1683490793454117], [9.930077307195203, -2.2481033370437284, 3.1559546612323746, 4.645744491112126], [4.636365302478454, -1.077621618352925, 4.837921912531801, 3.7699543611858295], [2.101041356847559, -4.957985094227054, 2.306428784025159, 2.405259867810611], [1.1021918780711277, -3.9995502610403046, 4.587565122130199, 1.4760121420987837], [6.674401360173392, -1.3882846400952769, 1.0559334739444455, 4.539603905561043], [5.812224568718528, -3.608929027593336, 4.769822141180919, 2.2957895068544474], [1.6608353699061413, -2.1468630971849465, 4.353220359499385, 1.6272887351816108], [9.83973669759822, -3.694627929800934, 4.908466137373177, 2.339862023225458], [7.2572621662219845, -4.082119952762019, 3.03647886597582, 3.157369076653918], [5.096626094123879, -4.0148407447524335, 3.584577609684989, 3.9386714409764445], [9.695520396432784, -3.841682556389667, 4.037598327276396, 1.3544798229971113], [8.531828877961596, -5.162502752749018, 2.6979804862377748, 1.81745262913411], [3.2809434793774432, -2.624037057484753, 2.9673206639412912, 3.9019081642290785], [8.457230541489096, -2.195783597966196, 2.816988510301825, 2.2023018256309954], [5.286300671617909, -2.276127871092696, 3.091953746313847, 4.050402550905636], [1.3735022420339893, -5.9296986538187975, 3.5796304900336886, 3.022918164772295], [5.12976493997133, -1.9385919032530614, 4.9838039436611705, 3.595289563770131], [7.915322962748654, -4.0586410793182, 4.484375321807362, 4.116384600238645], [3.5990494554272376, -3.94565063963875, 2.715038131546884, 1.0116718615772675]] 
+
     from Visor import BoardVision
     import time
     
     env = TetrisEnv()
-    seed = 5132
+    seed = 1234
     env.set_seed(seed)
     total_scores = []
     with open('output.txt', 'a') as f:
@@ -450,7 +461,7 @@ if __name__ == "__main__":
             #     print(rr)
             print('----')
             print(total_score)
-            # print(msg)
+            print(msg)
             #print_stats(use_visuals_in_trace, states, pieces, sleep_time)
 
         with open('output.txt', 'a') as f:
