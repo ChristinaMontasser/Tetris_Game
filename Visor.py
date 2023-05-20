@@ -127,10 +127,10 @@ class BoardVision:
             import pygame  # just pip install it, conda fails for some reasons
             pygame.init()
             pygame.mixer.init()
-            sound = pygame.mixer.Sound('./Visor_files/Tetris_theme.ogg')
-            sound.set_volume(0.2)  # it is loud, 0.4 is -3.98 dB, so I will go with ~ -7 which is 0.2
-            sound.play(-1)
-            BoardVision.main_sound = sound
+            # sound = pygame.mixer.Sound('./Visor_files/Tetris_theme.ogg')
+            # sound.set_volume(0.2)  # it is loud, 0.4 is -3.98 dB, so I will go with ~ -7 which is 0.2
+            # sound.play(-1)
+            # BoardVision.main_sound = sound
             BoardVision.Actv = True
         except ImportError or ModuleNotFoundError:
             print(' You can act like it is playing... ')
