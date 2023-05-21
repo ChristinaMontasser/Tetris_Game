@@ -2,7 +2,9 @@ import random
 
 import numpy as np
 from random import Random
-
+from Genetic_Algorithm import GA
+from feature_extraction import number_of_holes, count_complete_rows, calculate_bumpiness, \
+calculate_landing_height, count_block_transitions
 
 def condensed_print(matrix):
     for i in matrix:
@@ -225,64 +227,12 @@ class TetrisEnv:
                 self.__gen_next_piece()
                 board_states.append(self.board.copy())
                 if play_score < 0:
-                    if(self.score<0):
-                        return self.score, board_states, ratings_n_rotations, pieces_got, self.__get_lose_msg()
-                    else: 
-                        return self.score, board_states, ratings_n_rotations, pieces_got, ""
-
-            return self.score, board_states, ratings_n_rotations, pieces_got, ""
+                    print("Survived for {}".format(it))
+                    return self.score, board_states, ratings_n_rotations, pieces_got, self.__get_lose_msg(), it
+            return self.score, board_states, ratings_n_rotations, pieces_got, "", []
         # don't really feel like removing redundancy, cleaning code
 
-def number_of_holes(board):
-    height = len(board)
-    width = len(board[0])
-    gaps = 0
-    for col in range(width-1):
-        gap = False
-        for row in range(height-2, 0, -1):
-            if not board[row][col]:
-              if ((board[row+1][col] or gap) and (board[row][col-1] or col-1 == 0 or board[row-1][col-1]) and (board[row][col+1] or col == width-1 or board[row+1][col+1])):
-                    gaps += 1
-                    gap = True
-              else: 
-                  gap = False
-            else: 
-                  gap = False
-    return gaps
 
-def count_complete_rows(board):
-    height = len(board)
-    complete_rows = 0
-    for row in range(height):
-        if all(board[row]):
-            complete_rows += 1
-    return complete_rows
-
-def calculate_bumpiness(board):
-    heights = [0] * len(board[0])
-    for col in range(len(board[0])):
-        for row in range(len(board)):
-            if board[row][col] == 1:
-                heights[col] = len(board) - row
-                break
-    bumpiness = 0
-    for i in range(len(heights) - 1): #absoluate difference 
-        bumpiness += abs(heights[i] - heights[i+1])
-    return bumpiness
-
-def calculate_landing_height(board, block, column, i):
-    falling_piece = np.rot90(block, i, axes=(1, 0))
-    falling_piece_height = len(falling_piece)
-    for row in range(len(board) - 1, -1, -1): 
-        #20
-        #That first condition guarantee that we don't go deeper into the column until we reach the first row
-        #Because there's no piece whose height is only 1, so the logic is conditioned by the piece height itself (Empty column)
-        if row - falling_piece_height + 1 < 0 or \
-           any(board[row - i][column] for i in range(falling_piece_height)):
-            #It checks if any of the cells in the specified column and 
-            # the rows (with heighest block) below the current row are already occupied by existing blocks.
-            return row + 1
-    return 0
 
 # max gain + random
 def random_scoring_function(tetris_env: TetrisEnv, gen_params, col):
@@ -294,15 +244,16 @@ def random_scoring_function(tetris_env: TetrisEnv, gen_params, col):
     #Others:
         #Aggregate height
         #Number of holes
-    #     #Blockades
+        #Blockades
     board, piece, next_piece = tetris_env.get_status()  # add type hinting
-    
     rows_before=count_complete_rows(board)
     val1_scores = []
     val2_bumpiness = []
     val3_landing_height = []
     val4_clear_rows_after = []
     val5_number_of_holes = []
+    val6_block_transitions = []
+    val7_second_scores = []
     for i in range(4):
         score, tmp_board = tetris_env.test_play(board, piece, col, i)
         val4_clear_rows_after.append(count_complete_rows(tmp_board)-rows_before)
@@ -310,6 +261,7 @@ def random_scoring_function(tetris_env: TetrisEnv, gen_params, col):
         l_piece=tetris_env.Pieces[piece]
         val3_landing_height.append(calculate_landing_height(board, l_piece, col, i))
         val5_number_of_holes.append(number_of_holes(board))
+        val6_block_transitions.append(count_block_transitions(board))
         if score < 0:
             val1_scores.append(score )
             continue
@@ -317,13 +269,16 @@ def random_scoring_function(tetris_env: TetrisEnv, gen_params, col):
         for t in range(tetris_env.MAX_TETRIS_COLS):
             for j in range(4):
                 score2, _ = tetris_env.test_play(tmp_board, next_piece, t, j)
-                tmp_val1_scores.append(score2 )
+                tmp_val1_scores.append(score2)
+        #print(tmp_val1_scores)
         max_score2 = max(tmp_val1_scores)
+        # val7_second_scores.append(max_score2)
         if max_score2 >= 0:
-            score += max_score2
+             score += max_score2
         val1_scores.append(score)
-
-    fitness = [gen_params[0]*val1_scores[i] + gen_params[1]*val2_bumpiness[i] + gen_params[2]*val3_landing_height[i] - val4_clear_rows_after[i] - val5_number_of_holes[i] for i in range(4)]
+    #print(val7_second_scores)
+    fitness = [gen_params[0]*val1_scores[i] + gen_params[1]*val2_bumpiness[i] + gen_params[2]*val3_landing_height[i] + 
+               gen_params[3]*val4_clear_rows_after[i] + gen_params[4]*val5_number_of_holes[i] + gen_params[5]*val6_block_transitions[i] for i in range(4)]
     index, rate = max(enumerate(fitness), key=lambda item: item[1])  # need to store it first or it iterates
     return  rate, index
 
@@ -346,116 +301,34 @@ def print_stats(use_visuals_in_trace_p, states_p, pieces_p, sleep_time_p):
             print('-----')
 
 
-class GA:
-    def __init__(self, pop_size= 10):
-        self.init_pop_size= pop_size
-        self.population = []
-        self.init_population()
-
-    def init_population(self):
-        for i in range(self.init_pop_size):
-            chromosome = [random.uniform(1, 10), random.uniform(-6, -1), random.uniform(1, 5), random.uniform(1, 5), random.uniform(0, 1)]
-            self.population.append(chromosome)
-        
-    def __selection_operator(self, best_individual_indices: list,  number): # len(fitness_scores) = number of(choromsss)
-        candidates = []
-        for i in range(number):
-            idx1 = random.choice(best_individual_indices)
-            idx2 = random.choice(best_individual_indices)
-            if self.fitness_scores[idx1] > self.fitness_scores[idx2]:
-                candidates.append(idx1)
-                best_individual_indices.pop(best_individual_indices.index(idx1))
-            else:
-                candidates.append(idx2)
-                best_individual_indices.pop(best_individual_indices.index(idx2))
-        candidates
-        return candidates
-
-    def __crossover_operator(self, parent1, parent2):
-        crossover_point = random.randint(1, len(parent1) - 1)
-        child_1 = parent1[:crossover_point] + parent2[crossover_point:]
-        child_2 = parent2[:crossover_point] + parent1[crossover_point:]
-        return child_1, child_2
-    
-
-    def __mutation_operator(self, chromosome):
-        mutation_rate = 0.05
-        mutated_chromosome = []
-        for i in range(len(chromosome)):
-            if random.random() < mutation_rate:
-                new_gene = random.uniform(-10, 10)
-                mutated_chromosome.append(new_gene)
-            else:
-                mutated_chromosome.append(chromosome[i])
-        return mutated_chromosome
-    
-    
-    def __get_best_individual(self):
-        # Return the best individual (chromosome)
-        best_index = np.argmax(self.fitness_scores)
-        return best_index
-
-    def evolve_population(self, fitness_scores):
-        self.fitness_scores =  fitness_scores
-        elite_size= len(self.population)-1
-        best_individual_indices = sorted(range(len(self.fitness_scores)), key=lambda i: self.fitness_scores[i], reverse=True)[:elite_size]
-        #best_individual_values = [self.population[i] for i in best_individual_indices]
-        # print("best_individual_indices {}".format(best_individual_indices))
-        parents_indeces = self.__selection_operator(best_individual_indices, len(best_individual_indices)-1)
-
-        new_population = []
-        # print("self.population {}".format(self.population))
-        # print("parents_indeces {}".format(len(parents_indeces)))
-        # print("parents_indeces {}".format(parents_indeces))
-        for i in range(int((len(self.population)/2)-1)):
-            parent1_index, parent2_index = random.sample(parents_indeces, 2)
-            # print("parent1_index {}".format(parent1_index))
-            # print("parent2_index {}".format(parent2_index))
-            child_1, child_2 = self.__crossover_operator(self.population[parent1_index], self.population[parent2_index])
-            child_1 = self.__mutation_operator(child_1)
-            child_2 = self.__mutation_operator(child_2)
-            new_population.append(child_1)
-            new_population.append(child_2)
-
-        self.population = new_population 
-        print(self.__get_best_individual())
-        return self.population
-        
-
-
-
 if __name__ == "__main__":
     use_visuals_in_trace = False
     sleep_time = 0.8
     pop_size= 20
-    eposide = 1
+    eposide = 10
     # just one chromosome in the population
     ga_algo=GA(pop_size)
     population = ga_algo.population
-    #chromo_rando = [[3, -2, -2, 4], [3, -2, 2, 4]] #Send the best one
-    # population = [[2.8673550667, -4.915090563907668, 1.7326229294816473, 4.303487143315175], [2.8673550667, -4, 1.7326229294816473, 4.303487143315175],
-    #                [3, -4.915090563907668, 2, 5], [2.8673550667, -4.915090563907668, 4, 4.303487143315175],
-    #                [4, -4.915090563907668, 1.7326229294816473, 4.303487143315175]]
-    #one_chromo_competent = [-4, -1, 2,3]
-    #population  = [[4.555424009948208, -2.3777412669638744, 1.0187479578329186, 2.1683490793454117], [9.930077307195203, -2.2481033370437284, 3.1559546612323746, 4.645744491112126], [4.636365302478454, -1.077621618352925, 4.837921912531801, 3.7699543611858295], [2.101041356847559, -4.957985094227054, 2.306428784025159, 2.405259867810611], [1.1021918780711277, -3.9995502610403046, 4.587565122130199, 1.4760121420987837], [6.674401360173392, -1.3882846400952769, 1.0559334739444455, 4.539603905561043], [5.812224568718528, -3.608929027593336, 4.769822141180919, 2.2957895068544474], [1.6608353699061413, -2.1468630971849465, 4.353220359499385, 1.6272887351816108], [9.83973669759822, -3.694627929800934, 4.908466137373177, 2.339862023225458], [7.2572621662219845, -4.082119952762019, 3.03647886597582, 3.157369076653918], [5.096626094123879, -4.0148407447524335, 3.584577609684989, 3.9386714409764445], [9.695520396432784, -3.841682556389667, 4.037598327276396, 1.3544798229971113], [8.531828877961596, -5.162502752749018, 2.6979804862377748, 1.81745262913411], [3.2809434793774432, -2.624037057484753, 2.9673206639412912, 3.9019081642290785], [8.457230541489096, -2.195783597966196, 2.816988510301825, 2.2023018256309954], [5.286300671617909, -2.276127871092696, 3.091953746313847, 4.050402550905636], [1.3735022420339893, -5.9296986538187975, 3.5796304900336886, 3.022918164772295], [5.12976493997133, -1.9385919032530614, 4.9838039436611705, 3.595289563770131], [7.915322962748654, -4.0586410793182, 4.484375321807362, 4.116384600238645], [3.5990494554272376, -3.94565063963875, 2.715038131546884, 1.0116718615772675]] 
 
     from Visor import BoardVision
     import time
     
     env = TetrisEnv()
-    seed = 1234
+    seed = 100
     env.set_seed(seed)
     total_scores = []
+    its = []
     with open('output.txt', 'a') as f:
             f.write("Exprience 3 \n")
 
     for k in range (eposide):
         for i in range(len(population)):
-            total_score, states, rate_rot, pieces, msg = env.run(
+            total_score, states, rate_rot, pieces, msg, it = env.run(
                 random_scoring_function, population[i], 100, True)
             # after running your iterations (which should be at least 500 for each chromosome)
             # you can evolve your new chromosomes from the best after you test all chromosomes here
             total_scores.append(total_score)
+            its.append(it)
             # print("Ratings and rotations")
             # for rr in rate_rot:
             #     print(rr)
@@ -470,7 +343,7 @@ if __name__ == "__main__":
             f.write("Population is: {} \n".format(population))
             f.write("total_score is: {} \n".format(total_scores))
             
-        population = ga_algo.evolve_population(total_scores)
+        population = ga_algo.evolve_population(total_scores, its)
         if(len(population)<=1):
             break
         total_scores = []
