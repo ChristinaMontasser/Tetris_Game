@@ -12,7 +12,7 @@ class GA:
 
     def init_population(self):
         for i in range(self.init_pop_size):
-            chromosome = [random.uniform(1, 10), random.uniform(-6, -1), random.uniform(-4, -1), 
+            chromosome = [random.uniform(1, 10), random.uniform(-6, -1), random.uniform(-6, -1), 
                           random.uniform(1, 4), random.uniform(-3, 0), random.uniform(-4, -1) ]
             self.population.append(chromosome)
     #val1_scores = []
@@ -30,10 +30,10 @@ class GA:
             idx2 = random.choice(best_individual_indices)
             if self.fitness_scores[idx1] > self.fitness_scores[idx2]:
                 candidates.append(idx1)
-                best_individual_indices.pop(best_individual_indices.index(idx1))
+                #best_individual_indices.pop(best_individual_indices.index(idx1))
             else:
                 candidates.append(idx2)
-                best_individual_indices.pop(best_individual_indices.index(idx2))
+                #best_individual_indices.pop(best_individual_indices.index(idx2))
         candidates
         return candidates
 
@@ -45,11 +45,11 @@ class GA:
     
 
     def __mutation_operator(self, chromosome):
-        mutation_rate = 0.05
+        mutation_rate = 0.02
         mutated_chromosome = []
         for i in range(len(chromosome)):
             if random.random() < mutation_rate:
-                new_gene = random.uniform(-2,2)
+                new_gene = random.uniform(-1,1)
                 mutated_chromosome.append(chromosome[i]+new_gene)
             else:
                 mutated_chromosome.append(chromosome[i])
@@ -62,14 +62,13 @@ class GA:
 
     def evolve_population(self, fitness_scores, its):
         self.fitness_scores =  fitness_scores
-        elite_size= int(len(self.population)*0.75)
-        best_individual_indices = sorted(range(len(self.fitness_scores)), key=lambda i: self.fitness_scores[i], reverse=True)[:elite_size]
+        best_size= int(len(self.population))
+        best_individual_indices = sorted(range(len(self.fitness_scores)), key=lambda i: self.fitness_scores[i], reverse=True)[:best_size]
         #best_individual_values = [self.population[i] for i in best_individual_indices]
         # print("best_individual_indices {}".format(best_individual_indices))
-        parents_indeces = self.__selection_operator(best_individual_indices, len(best_individual_indices)-1)
-
+        parents_indeces = self.__selection_operator(best_individual_indices, len(best_individual_indices))
         new_population = []
-        for i in range(int((len(best_individual_indices)/2)-2)):
+        for i in range(int(len(best_individual_indices))):
             parent1_index, parent2_index = random.sample(parents_indeces, 2)
             # print("parent1_index {}".format(parent1_index))
             # print("parent2_index {}".format(parent2_index))
@@ -78,10 +77,10 @@ class GA:
             #child_2 = self.__mutation_operator(child_2)
             new_population.append(child_1)
             #new_population.append(child_2)
-        for i in best_individual_indices[:int(len(best_individual_indices)/4)]:
+        for i in best_individual_indices[:int(len(best_individual_indices))]:
             new_population.append(self.population[i])
         self.population = new_population 
-        print(self.__get_best_individual())
-        return self.population
+        #print(self.__get_best_individual())
+        return self.population  
         
 

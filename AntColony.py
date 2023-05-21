@@ -28,7 +28,6 @@ def generate_cities(num_cities=5, pheromone_initial=1, min_distance= 0, max_dist
         
     return distances, pheromone, cities
 
-
 class Ant:
     def __init__(self, start_city, distances, cities):
         self.start_city = start_city
@@ -111,14 +110,15 @@ def run(num_of_ants, num_iterations, distances, pheromone, cities):
             print("Best Distance = {}".format(best_ant.total_distance))
             print("Pheromone Map = {}".format(pheromone_map))
             print("Pheromone Best Ant = {} \n".format(pheromone_map[best_ant_index]))
+            print("Visited {}".format(best_ant.v_cities))
+
 
         for ant in ants:
             #print("Total distance {}".format(ant.total_distance))
-            # print("Visited {}".format(ant.v_cities))
             ant.reset_ant()
 
-
 if __name__ == "__main__":
+    
     num_ants = 10
     alpha = 1.0
     beta = 2.0
@@ -126,6 +126,5 @@ if __name__ == "__main__":
     exploration = 0.9
     num_iterations = 100
 
-    distances1, pheromone1, cities1 = generate_cities(num_cities=10, min_distance=3, max_distance=50)
-    print("testing on 10 cities and 5 ants")
-    run(5, 50, distances1, pheromone1, cities1)
+    distances1, pheromone1, cities1 = generate_cities(num_cities=10, min_distance=3, max_distance=40)
+    distances1

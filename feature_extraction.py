@@ -45,13 +45,11 @@ def count_block_transitions(board):
     width = len(board[0])
     transitions = 0
 
-    # Check for transitions between adjacent rows
     for row in range(height - 1):
         for col in range(width):
             if board[row][col] != board[row + 1][col]:
                 transitions += 1
 
-    # Check for transitions between adjacent columns
     for col in range(width - 1):
         for row in range(height):
             if board[row][col] != board[row][col + 1]:

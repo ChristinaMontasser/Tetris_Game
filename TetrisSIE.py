@@ -227,7 +227,7 @@ class TetrisEnv:
                 self.__gen_next_piece()
                 board_states.append(self.board.copy())
                 if play_score < 0:
-                    print("Survived for {}".format(it))
+                    #print("Survived for {}".format(it))
                     return self.score, board_states, ratings_n_rotations, pieces_got, self.__get_lose_msg(), it
             return self.score, board_states, ratings_n_rotations, pieces_got, "", []
         # don't really feel like removing redundancy, cleaning code
@@ -302,14 +302,14 @@ def print_stats(use_visuals_in_trace_p, states_p, pieces_p, sleep_time_p):
 
 
 if __name__ == "__main__":
-    use_visuals_in_trace = False
+    use_visuals_in_trace = True
     sleep_time = 0.8
-    pop_size= 20
+    pop_size= 100
     eposide = 10
     # just one chromosome in the population
     ga_algo=GA(pop_size)
-    population = ga_algo.population
-
+    #population = ga_algo.population
+    population = [[7.8375480729014715, -4.061839710999572, -2.0113816249913055, 2.380906310983931, -0.2406089390313637, -3.456002498876666], [5.621705573970637, -4.843370462068632, -3.8628706254586556, 1.8317335595358646, -0.2534419452340977, -3.456002498876666]]
     from Visor import BoardVision
     import time
     
@@ -318,8 +318,6 @@ if __name__ == "__main__":
     env.set_seed(seed)
     total_scores = []
     its = []
-    with open('output.txt', 'a') as f:
-            f.write("Exprience 3 \n")
 
     for k in range (eposide):
         for i in range(len(population)):
@@ -335,8 +333,7 @@ if __name__ == "__main__":
             print('----')
             print(total_score)
             print(msg)
-            #print_stats(use_visuals_in_trace, states, pieces, sleep_time)
-
+            # print_stats(use_visuals_in_trace, states, pieces, sleep_time)
         with open('output.txt', 'a') as f:
             f.write("Iteration {} \n".format(k))
             f.write("Cofig: Seed {} \n".format(seed))
@@ -344,6 +341,7 @@ if __name__ == "__main__":
             f.write("total_score is: {} \n".format(total_scores))
             
         population = ga_algo.evolve_population(total_scores, its)
-        if(len(population)<=1):
-            break
+        # print("Evolved")
+        # if(len(population)<=1):
+        #     break
         total_scores = []
